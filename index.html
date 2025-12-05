@@ -2,24 +2,44 @@
 <html lang="ru">
 <head>
   <meta charset="utf-8" />
-  <title>Copy</title>
+  <title>Копировать бриф</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
     body {
-      margin: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
       font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      margin: 0;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      justify-content: center;
+      align-items: stretch;
       background: #ffffff;
-      color: #222;
+    }
+    .hint {
       font-size: 14px;
+      color: #444;
+    }
+    button {
+      width: 100%;
+      padding: 12px 16px;
+      border-radius: 8px;
+      border: none;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      background: #4a7cff;
+      color: #fff;
+    }
+    button:active {
+      transform: scale(0.98);
     }
   </style>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
 <body>
-  <div id="status">Копируем…</div>
+  <div class="hint">Нажмите кнопку ниже, чтобы скопировать шаблон брифа.</div>
+  <button id="copyBtn">Скопировать текст</button>
 
   <script>
     const text = `Название проекта: …
@@ -27,25 +47,50 @@
 Описание целевой аудитории: …
 Комментарий/запреты/пожелания: …`;
 
-    async function copyAndClose() {
+    async function copyText() {
+      // Сначала пробуем современный API
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        try {
+          await navigator.clipboard.writeText(text);
+          alert('Текст скопирован 👍');
+          closeWebApp();
+          return;
+        } catch (e) {
+          console.log('Clipboard API failed, fallback to execCommand', e);
+        }
+      }
+
+      // Фолбэк через скрытый textarea + execCommand
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      textarea.style.position = 'fixed';
+      textarea.style.opacity = '0';
+      textarea.style.left = '-9999px';
+      document.body.appendChild(textarea);
+      textarea.select();
       try {
-        await navigator.clipboard.writeText(text);
-        document.getElementById('status').textContent = 'Скопировано 👍';
-        // даём Telegram время отрисовать статус, потом закрываем
-        setTimeout(() => {
-          if (window.Telegram && Telegram.WebApp) {
-            Telegram.WebApp.close();
-          } else {
-            window.close();
-          }
-        }, 600);
+        const ok = document.execCommand('copy');
+        alert(ok ? 'Текст скопирован 👍' : 'Не получилось, скопируйте вручную');
       } catch (e) {
-        document.getElementById('status').textContent =
-          'Не получилось автоматически — скопируйте текст вручную.';
+        alert('Не получилось, скопируйте вручную');
+      }
+      document.body.removeChild(textarea);
+      closeWebApp();
+    }
+
+    function closeWebApp() {
+      try {
+        if (window.Telegram && Telegram.WebApp) {
+          Telegram.WebApp.close();
+        } else {
+          window.close();
+        }
+      } catch (e) {
+        console.log('Cannot close webapp', e);
       }
     }
 
-    document.addEventListener('DOMContentLoaded', copyAndClose);
+    document.getElementById('copyBtn').addEventListener('click', copyText);
   </script>
 </body>
 </html>
