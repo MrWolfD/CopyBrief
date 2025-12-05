@@ -19,6 +19,7 @@
     .hint {
       font-size: 14px;
       color: #444;
+      text-align: center;
     }
     button {
       width: 100%;
@@ -34,49 +35,24 @@
     button:active {
       transform: scale(0.98);
     }
+    #copyBtn {
+      display: none; /* изначально скрыта, покажем только если автокопирование не удалось */
+    }
   </style>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
 <body>
-  <div class="hint">Нажмите кнопку ниже, чтобы скопировать шаблон брифа.</div>
+  <div class="hint" id="hint">Пробуем скопировать шаблон брифа…</div>
   <button id="copyBtn">Скопировать текст</button>
 
   <script>
-    const text = `Название проекта: …
+    const TEXT_TO_COPY = `Название проекта: …
 Описание продукта/услуги: …
 Описание целевой аудитории: …
 Комментарий/запреты/пожелания: …`;
 
-    async function copyText() {
-      // Сначала пробуем современный API
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        try {
-          await navigator.clipboard.writeText(text);
-          alert('Текст скопирован 👍');
-          closeWebApp();
-          return;
-        } catch (e) {
-          console.log('Clipboard API failed, fallback to execCommand', e);
-        }
-      }
-
-      // Фолбэк через скрытый textarea + execCommand
-      const textarea = document.createElement('textarea');
-      textarea.value = text;
-      textarea.style.position = 'fixed';
-      textarea.style.opacity = '0';
-      textarea.style.left = '-9999px';
-      document.body.appendChild(textarea);
-      textarea.select();
-      try {
-        const ok = document.execCommand('copy');
-        alert(ok ? 'Текст скопирован 👍' : 'Не получилось, скопируйте вручную');
-      } catch (e) {
-        alert('Не получилось, скопируйте вручную');
-      }
-      document.body.removeChild(textarea);
-      closeWebApp();
-    }
+    const hintEl = document.getElementById('hint');
+    const copyBtn = document.getElementById('copyBtn');
 
     function closeWebApp() {
       try {
@@ -90,7 +66,61 @@
       }
     }
 
-    document.getElementById('copyBtn').addEventListener('click', copyText);
+    async function copyTextCore() {
+      // Сначала пробуем современный Clipboard API
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        try {
+          await navigator.clipboard.writeText(TEXT_TO_COPY);
+          return true;
+        } catch (e) {
+          console.log('Clipboard API failed, fallback to execCommand', e);
+        }
+      }
+
+      // Фолбэк через textarea + execCommand
+      try {
+        const textarea = document.createElement('textarea');
+        textarea.value = TEXT_TO_COPY;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        textarea.style.left = '-9999px';
+        document.body.appendChild(textarea);
+        textarea.select();
+        const ok = document.execCommand('copy');
+        document.body.removeChild(textarea);
+        return ok;
+      } catch (e) {
+        console.log('execCommand copy failed', e);
+        return false;
+      }
+    }
+
+    // Попытка автокопирования при загрузке
+    async function tryAutoCopy() {
+      const success = await copyTextCore();
+      if (success) {
+        // Удаляем хинт, чтобы не мигал
+        hintEl.textContent = 'Текст скопирован 👍';
+        setTimeout(closeWebApp, 500);
+      } else {
+        // Автокопирование не удалось — показываем кнопку
+        hintEl.textContent = 'Не получилось скопировать автоматически. Нажмите кнопку ниже, чтобы скопировать текст.';
+        copyBtn.style.display = 'block';
+      }
+    }
+
+    // Копирование по кнопке + закрытие
+    copyBtn.addEventListener('click', async () => {
+      const success = await copyTextCore();
+      if (success) {
+        alert('Текст скопирован 👍');
+      } else {
+        alert('Не удалось автоматически скопировать. Выделите текст вручную.');
+      }
+      closeWebApp();
+    });
+
+    document.addEventListener('DOMContentLoaded', tryAutoCopy);
   </script>
 </body>
 </html>
